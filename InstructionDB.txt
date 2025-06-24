@@ -1,0 +1,96 @@
+-- Create the database if it doesn't exist
+CREATE DATABASE IF NOT EXISTS `realpage_donations`;
+
+-- Use the newly created database
+USE `realpage_donations`;
+
+-- Table for storing user information (basic for now)
+-- In a real application, you would also store hashed passwords,
+-- user roles, and more detailed profiles.
+CREATE TABLE IF NOT EXISTS `users` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `email` VARCHAR(255) NOT NULL UNIQUE,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for storing One-Time Passwords (OTPs)
+CREATE TABLE IF NOT EXISTS `otps` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `email` VARCHAR(255) NOT NULL,
+    `otp_code` VARCHAR(6) NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `expires_at` TIMESTAMP NOT NULL,
+    INDEX (`email`), -- Add an index on email for faster lookups
+    FOREIGN KEY (`email`) REFERENCES `users`(`email`) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Table for storing NGO information
+CREATE TABLE IF NOT EXISTS `ngos` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(255) NOT NULL UNIQUE,
+    `logo_url` VARCHAR(255) NOT NULL,
+    `description` TEXT,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for storing the requirements of each NGO
+CREATE TABLE IF NOT EXISTS `ngo_requirements` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `ngo_id` INT NOT NULL,
+    `category` VARCHAR(100) NOT NULL, -- e.g., 'Study Items', 'Clothing', 'Electronics'
+    `item_name` VARCHAR(255) NOT NULL, -- e.g., 'Books', 'Pens', 'Laptops'
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`ngo_id`) REFERENCES `ngos`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    UNIQUE (`ngo_id`, `item_name`) -- Ensure an NGO doesn't have duplicate item requirements
+);
+
+-- Table for storing donation/giveaway/resale records
+CREATE TABLE IF NOT EXISTS `donations` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT NOT NULL,
+    `ngo_id` INT NOT NULL,
+    `action_type` ENUM('donate', 'giveaway', 'resale') NOT NULL,
+    `item_category` VARCHAR(100) NOT NULL,
+    `item_name` VARCHAR(255) NOT NULL,
+    `quantity` INT NOT NULL DEFAULT 1,
+    `original_cost` DECIMAL(10, 2) NULL, -- For resale items
+    `purchase_year` INT NULL, -- For resale items, year of original purchase
+    `resale_amount` DECIMAL(10, 2) NULL, -- Calculated amount for resale
+    `status` ENUM('pending', 'completed', 'cancelled') DEFAULT 'pending',
+    `transaction_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (`ngo_id`) REFERENCES `ngos`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Table to keep track of the total donor count (can be derived from `donations` but kept separate for simple display)
+CREATE TABLE IF NOT EXISTS `donor_counts` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `total_donors` INT NOT NULL DEFAULT 0,
+    `last_updated` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Insert initial dummy NGOs (you can add more)
+INSERT IGNORE INTO `ngos` (`name`, `logo_url`, `description`) VALUES
+('Childrens Welfare Fund', 'https://placehold.co/100x100/ADD8E6/000000?text=CWF', 'Supporting education and well-being of children.'),
+('Green Earth Alliance', 'https://placehold.co/100x100/90EE90/000000?text=GEA', 'Promoting environmental sustainability.'),
+('Elderly Care Foundation', 'https://placehold.co/100x100/DDA0DD/000000?text=ECF', 'Providing care and support for the elderly.'),
+('Animal Haven', 'https://placehold.co/100x100/FFDAB9/000000?text=AH', 'Rescuing and rehabilitating animals.'),
+('Food for All', 'https://placehold.co/100x100/FFFACD/000000?text=FFA', 'Working to end hunger and food insecurity.');
+
+-- Insert initial dummy NGO requirements
+INSERT IGNORE INTO `ngo_requirements` (`ngo_id`, `category`, `item_name`) VALUES
+(1, 'Study Items', 'Books'),
+(1, 'Study Items', 'Pens'),
+(1, 'Study Items', 'Pencils'),
+(1, 'Clothing', 'T-Shirts (Age 6-12)'),
+(1, 'Clothing', 'Pants (Age 6-12)'),
+(2, 'Electronics', 'Used Laptops'),
+(2, 'Electronics', 'Used Tablets'),
+(3, 'Clothing', 'Sweaters (Adult)'),
+(3, 'Study Items', 'Large Print Books'),
+(4, 'Other', 'Pet Food'),
+(4, 'Other', 'Pet Toys'),
+(5, 'Food Items', 'Non-perishable food');
+
+-- Initialize donor count
+INSERT IGNORE INTO `donor_counts` (`id`, `total_donors`) VALUES (1, 0);
