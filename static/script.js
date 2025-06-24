@@ -36,17 +36,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Navigation/Page Switching Functions ---
     function showPage(pageId) {
-        // Hide all main pages
-        loginPage.classList.add('hidden');
-        dashboardPage.classList.add('hidden', 'flex-col');
-        ngoDetailsPage.classList.add('hidden', 'flex-col');
+        // Prepare all pages to be hidden and transitionable
+        [loginPage, dashboardPage, ngoDetailsPage].forEach(page => {
+            page.classList.remove('show-page'); // Remove active state
+            // Immediately hide before potentially showing, allows for transition when 'show-page' is added back
+            page.classList.add('hidden');
+        });
 
-        // Show the requested page
+        // Show the requested page with transition classes
         const pageToShow = document.getElementById(pageId);
         if (pageToShow) {
+            // Remove 'hidden' first, then add 'show-page' to trigger transition
             pageToShow.classList.remove('hidden');
+            // Use requestAnimationFrame to ensure the browser registers the display change
+            // before the opacity/transform transition is applied.
+            requestAnimationFrame(() => {
+                pageToShow.classList.add('show-page');
+            });
+            // Ensure flex-col for relevant pages if they need a column layout
             if (pageId === 'dashboard-page' || pageId === 'ngo-details-page') {
-                pageToShow.classList.add('flex-col'); // Ensure flex-col for layout
+                pageToShow.classList.add('flex-col');
             }
         }
     }
@@ -82,11 +91,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function showLoginPage(msg = '') {
         showPage('login-page');
         messageDisplay.textContent = msg;
-        messageDisplay.className = `mt-4 text-center font-medium ${msg.includes('successful') ? 'text-green-600' : 'text-red-600'}`;
+        messageDisplay.className = 'mt-4 text-center font-semibold text-sm p-3 rounded-lg'; // Reset classes
+        if (msg.includes('successful')) {
+            messageDisplay.classList.add('text-green-700', 'bg-green-100', 'border', 'border-green-300');
+        } else if (msg) {
+            messageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
+        }
         emailField.value = '';
         otpField.value = '';
         otpInputSection.classList.add('hidden');
-        sendOtpButton.textContent = 'Click to Verify Email';
+        sendOtpButton.innerHTML = 'Click to Verify Email <i class="fas fa-paper-plane ml-2"></i>'; // Reset button text/icon
         sendOtpButton.disabled = false;
     }
 
@@ -94,13 +108,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = emailField.value.trim();
         if (!email) {
             messageDisplay.textContent = 'Email is required.';
-            messageDisplay.className = 'mt-4 text-center font-medium text-red-600';
+            messageDisplay.className = 'mt-4 text-center font-semibold text-sm p-3 rounded-lg text-red-700 bg-red-100 border border-red-300';
             return;
         }
 
-        sendOtpButton.textContent = 'Sending OTP...';
+        sendOtpButton.innerHTML = 'Sending OTP... <i class="fas fa-spinner fa-spin ml-2"></i>';
         sendOtpButton.disabled = true;
         messageDisplay.textContent = '';
+        messageDisplay.className = 'mt-4 text-center font-semibold text-sm p-3 rounded-lg'; // Clear previous message styles
 
         try {
             const response = await fetch(`${API_BASE_URL}/login/send_otp`, {
@@ -112,19 +127,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok) {
                 messageDisplay.textContent = data.message + " (Check backend console for OTP)";
-                messageDisplay.className = 'mt-4 text-center font-medium text-green-600';
+                messageDisplay.classList.add('text-green-700', 'bg-green-100', 'border', 'border-green-300');
                 displayEmailField.value = email; // Show email in OTP section
-                otpInputSection.classList.remove('hidden');
+                otpInputSection.classList.remove('hidden'); // Show OTP input section
+                // Use requestAnimationFrame for otpInputSection transition
+                requestAnimationFrame(() => {
+                    otpInputSection.classList.add('show-page'); // Add show-page to new section
+                });
             } else {
                 messageDisplay.textContent = data.message;
-                messageDisplay.className = 'mt-4 text-center font-medium text-red-600';
+                messageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
             }
         } catch (error) {
             console.error('Error sending OTP:', error);
             messageDisplay.textContent = 'Failed to connect to server. Please try again.';
-            messageDisplay.className = 'mt-4 text-center font-medium text-red-600';
+            messageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
         } finally {
-            sendOtpButton.textContent = 'Click to Verify Email';
+            sendOtpButton.innerHTML = 'Click to Verify Email <i class="fas fa-paper-plane ml-2"></i>';
             sendOtpButton.disabled = false;
         }
     });
@@ -134,13 +153,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const otp = otpField.value.trim();
         if (!email || !otp) {
             messageDisplay.textContent = 'Email and OTP are required.';
-            messageDisplay.className = 'mt-4 text-center font-medium text-red-600';
+            messageDisplay.className = 'mt-4 text-center font-semibold text-sm p-3 rounded-lg text-red-700 bg-red-100 border border-red-300';
             return;
         }
 
-        verifyOtpButton.textContent = 'Verifying...';
+        verifyOtpButton.innerHTML = 'Verifying... <i class="fas fa-spinner fa-spin ml-2"></i>';
         verifyOtpButton.disabled = true;
         messageDisplay.textContent = '';
+        messageDisplay.className = 'mt-4 text-center font-semibold text-sm p-3 rounded-lg'; // Clear previous message styles
 
         try {
             const response = await fetch(`${API_BASE_URL}/login/verify_otp`, {
@@ -152,20 +172,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok) {
                 messageDisplay.textContent = data.message;
-                messageDisplay.className = 'mt-4 text-center font-medium text-green-600';
+                messageDisplay.classList.add('text-green-700', 'bg-green-100', 'border', 'border-green-300');
                 localStorage.setItem('userEmail', email); // Store user email on successful login
                 currentLoggedInEmail = email;
-                navigateTo('#dashboard'); // Go to dashboard
+                setTimeout(() => { // Small delay for message to be visible
+                    navigateTo('#dashboard'); // Go to dashboard
+                }, 1000); 
             } else {
                 messageDisplay.textContent = data.message;
-                messageDisplay.className = 'mt-4 text-center font-medium text-red-600';
+                messageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
             }
         } catch (error) {
             console.error('Error verifying OTP:', error);
             messageDisplay.textContent = 'Failed to connect to server. Please try again.';
-            messageDisplay.className = 'mt-4 text-center font-medium text-red-600';
+            messageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
         } finally {
-            verifyOtpButton.textContent = 'Login';
+            verifyOtpButton.innerHTML = 'Login <i class="fas fa-sign-in-alt ml-2"></i>';
             verifyOtpButton.disabled = false;
         }
     });
@@ -185,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function fetchTotalDonors() {
+        totalDonorsDisplay.textContent = 'Loading...';
         try {
             const response = await fetch(`${API_BASE_URL}/donors/total`);
             const data = await response.json();
@@ -201,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchNgos() {
-        ngoListContainer.innerHTML = '<div class="col-span-full text-center text-gray-600">Loading NGOs...</div>';
+        ngoListContainer.innerHTML = '<div class="col-span-full text-center text-gray-600 text-lg py-4">Loading NGOs...</div>';
         try {
             const response = await fetch(`${API_BASE_URL}/ngos`);
             const ngos = await response.json();
@@ -209,13 +232,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 ngoListContainer.innerHTML = ''; // Clear loading message
                 if (ngos.length === 0) {
-                    ngoListContainer.innerHTML = '<div class="col-span-full text-center text-gray-600">No NGOs found.</div>';
+                    ngoListContainer.innerHTML = '<div class="col-span-full text-center text-gray-600 text-lg py-4">No NGOs found.</div>';
                     return;
                 }
                 ngos.forEach(ngo => {
                     const ngoElement = document.createElement('a');
                     ngoElement.href = `#ngo-details/${ngo.id}`;
-                    ngoElement.className = 'flex items-center bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 ease-in-out overflow-hidden';
+                    ngoElement.className = 'flex items-center bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:translate-y-[-5px] transition-all duration-200 ease-in-out overflow-hidden cursor-pointer';
                     ngoElement.innerHTML = `
                         <img src="${ngo.logo_url}" alt="${ngo.name} logo" class="w-24 h-24 object-cover rounded-l-lg flex-shrink-0" onerror="this.onerror=null;this.src='https://placehold.co/100x100/CCCCCC/000000?text=Logo';" />
                         <div class="p-4 flex-grow">
@@ -236,11 +259,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     ngoListContainer.appendChild(ngoElement);
                 });
             } else {
-                ngoListContainer.innerHTML = `<div class="col-span-full text-center text-red-600">Error loading NGOs: ${ngos.message}</div>`;
+                ngoListContainer.innerHTML = `<div class="col-span-full text-center text-red-600 text-lg py-4">Error loading NGOs: ${ngos.message}</div>`;
             }
         } catch (error) {
             console.error('Error fetching NGOs:', error);
-            ngoListContainer.innerHTML = '<div class="col-span-full text-center text-red-600">Failed to connect to server to load NGOs.</div>';
+            ngoListContainer.innerHTML = '<div class="col-span-full text-center text-red-600 text-lg py-4">Failed to connect to server to load NGOs.</div>';
         }
     }
 
@@ -248,11 +271,13 @@ document.addEventListener('DOMContentLoaded', () => {
     async function showNgoDetailsPage(ngoId) {
         showPage('ngo-details-page');
         ngoDetailsTitle.textContent = 'Loading NGO Details...';
-        ngoRequirementsSections.innerHTML = '<div class="text-center text-gray-600">Loading requirements...</div>';
+        ngoRequirementsSections.innerHTML = '<div class="text-center text-gray-600 text-lg py-4">Loading requirements...</div>';
         actionMessageDisplay.textContent = ''; // Clear previous action message
+        actionMessageDisplay.className = 'mt-6 text-center font-semibold text-lg p-3 rounded-lg'; // Reset styles
         originalCostField.value = '';
         purchaseYearField.value = '';
         selectedItemsForDonation = {}; // Reset selected items
+        updateActionButtonsState(); // Disable buttons initially
 
         try {
             const response = await fetch(`${API_BASE_URL}/ngo_requirements/${ngoId}`);
@@ -263,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ngoRequirementsSections.innerHTML = ''; // Clear loading message
 
                 if (Object.keys(data.requirements).length === 0) {
-                    ngoRequirementsSections.innerHTML = '<div class="text-center text-gray-600">No specific requirements listed for this NGO.</div>';
+                    ngoRequirementsSections.innerHTML = '<div class="text-center text-gray-600 text-lg py-4">No specific requirements listed for this NGO.</div>';
                     return;
                 }
 
@@ -277,8 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         const itemContainer = document.createElement('div');
                         itemContainer.className = 'flex items-center';
                         itemContainer.innerHTML = `
-                            <input type="checkbox" id="item-${category}-${item.replace(/\s/g, '-')}" data-category="${category}" data-item="${item}" class="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500" />
-                            <label for="item-${category}-${item.replace(/\s/g, '-')}" class="ml-2 text-gray-700 text-lg cursor-pointer">${item}</label>
+                            <input type="checkbox" id="item-${category.replace(/\s/g, '-')}-${item.replace(/\s/g, '-')}" data-category="${category}" data-item="${item}" class="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500" />
+                            <label for="item-${category.replace(/\s/g, '-')}-${item.replace(/\s/g, '-')}" class="ml-2 text-gray-700 text-lg cursor-pointer">${item}</label>
                         `;
                         itemsDiv.appendChild(itemContainer);
 
@@ -307,12 +332,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateActionButtonsState(); // Set initial state of buttons
             } else {
                 ngoDetailsTitle.textContent = 'Error';
-                ngoRequirementsSections.innerHTML = `<div class="text-center text-red-600">Error loading NGO requirements: ${data.message}</div>`;
+                ngoRequirementsSections.innerHTML = `<div class="text-center text-red-600 text-lg py-4">Error loading NGO requirements: ${data.message}</div>`;
             }
         } catch (error) {
             console.error('Error fetching NGO details:', error);
             ngoDetailsTitle.textContent = 'Error';
-            ngoRequirementsSections.innerHTML = '<div class="text-center text-red-600">Failed to connect to server to load NGO requirements.</div>';
+            ngoRequirementsSections.innerHTML = '<div class="text-center text-red-600 text-lg py-4">Failed to connect to server to load NGO requirements.</div>';
         }
     }
 
@@ -335,13 +360,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleDonationAction(actionType) {
         actionMessageDisplay.textContent = '';
+        actionMessageDisplay.className = 'mt-6 text-center font-semibold text-lg p-3 rounded-lg'; // Reset styles
+
         let buttonToDisable = null;
         if (actionType === 'donate') buttonToDisable = donateButton;
         if (actionType === 'giveaway') buttonToDisable = giveawayButton;
         if (actionType === 'resale') buttonToDisable = resaleButton;
 
         if (buttonToDisable) {
-            buttonToDisable.textContent = 'Processing...';
+            buttonToDisable.innerHTML = `Processing... <i class="fas fa-spinner fa-spin ml-2"></i>`;
             donateButton.disabled = true;
             giveawayButton.disabled = true;
             resaleButton.disabled = true;
@@ -356,9 +383,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (itemsToSubmit.length === 0) {
             actionMessageDisplay.textContent = 'Please select at least one item.';
-            actionMessageDisplay.className = 'mt-6 text-center font-medium text-red-600';
+            actionMessageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
             if (buttonToDisable) {
-                buttonToDisable.textContent = actionType.charAt(0).toUpperCase() + actionType.slice(1);
+                buttonToDisable.innerHTML = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} ${getIconForAction(actionType)}`;
                 updateActionButtonsState();
             }
             return;
@@ -376,9 +403,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const purchaseYear = purchaseYearField.value.trim();
             if (!originalCost || !purchaseYear) {
                 actionMessageDisplay.textContent = 'Original cost and purchase year are required for resale.';
-                actionMessageDisplay.className = 'mt-6 text-center font-medium text-red-600';
+                actionMessageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
                 if (buttonToDisable) {
-                    buttonToDisable.textContent = 'Resale';
+                    buttonToDisable.innerHTML = `Resale <i class="fas fa-hand-holding-usd ml-2"></i>`;
                     updateActionButtonsState();
                 }
                 return;
@@ -397,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok) {
                 actionMessageDisplay.textContent = data.message;
-                actionMessageDisplay.className = 'mt-6 text-center font-medium text-green-600';
+                actionMessageDisplay.classList.add('text-green-700', 'bg-green-100', 'border', 'border-green-300');
                 // Clear selections and reset fields after successful submission
                 selectedItemsForDonation = {};
                 originalCostField.value = '';
@@ -409,17 +436,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 await fetchTotalDonors(); // Update donor count on dashboard
             } else {
                 actionMessageDisplay.textContent = data.message;
-                actionMessageDisplay.className = 'mt-6 text-center font-medium text-red-600';
+                actionMessageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
             }
         } catch (error) {
             console.error('Error processing action:', error);
             actionMessageDisplay.textContent = 'Failed to connect to server. Please try again.';
-            actionMessageDisplay.className = 'mt-6 text-center font-medium text-red-600';
+            actionMessageDisplay.classList.add('text-red-700', 'bg-red-100', 'border', 'border-red-300');
         } finally {
             if (buttonToDisable) {
-                buttonToDisable.textContent = actionType.charAt(0).toUpperCase() + actionType.slice(1);
+                buttonToDisable.innerHTML = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} ${getIconForAction(actionType)}`;
             }
             updateActionButtonsState();
+        }
+    }
+
+    // Helper function to get icon HTML for button text
+    function getIconForAction(actionType) {
+        switch (actionType) {
+            case 'donate': return '<i class="fas fa-gift ml-2"></i>';
+            case 'giveaway': return '<i class="fas fa-hands-helping ml-2"></i>';
+            case 'resale': return '<i class="fas fa-hand-holding-usd ml-2"></i>';
+            default: return '';
         }
     }
 

@@ -77,7 +77,7 @@ def send_otp():
         expires_at = datetime.now() + timedelta(seconds=120)
 
         # Clear any existing OTPs for this email to ensure only one is active
-        cursor.execute("DELETE FROM otps WHERE email = %s", (email,))
+        cursor.execute("DELETE FROM otps WHERE otps.email = %s", (email,))
         
         # Store OTP in the database
         cursor.execute(
